@@ -9,7 +9,7 @@ class FormRecordAdmin(forms.ModelForm):
         if not self.instance.borrowed_ID or self.instance.is_return:
             self.fields['is_return'].disabled = True
             self.fields['returned_date'].disabled = True
-        self.fields['time'].disabled = True
+            self.fields['penalty'].disabled = True
 
     def clean(self):
         member_fk = self.cleaned_data.get('borrowed_member')
@@ -17,7 +17,10 @@ class FormRecordAdmin(forms.ModelForm):
         book_fk = self.cleaned_data.get('borrowed_book')
         borrow_count = Record.objects.filter(borrowed_member__member_ID=member_fk.member_ID).\
             filter(is_return=False).count()
-
+        book_issue = Record.objects.filter(borrowed_member__member_ID=member_fk.member_ID).\
+            filter(borrowed_book__isbn=book_fk.isbn).filter(is_return=False).exists()
+        if book_issue and not is_return:
+            raise forms.ValidationError(f'Book has been taken by {member_fk.member_name}', code='book issued')
         if borrow_count > 4 and not is_return:
             raise forms.ValidationError(f'Book borrow count is exceeded!', code='invalid')
         if book_fk.stock <= 0 and not is_return:
@@ -25,20 +28,13 @@ class FormRecordAdmin(forms.ModelForm):
 
         return self.cleaned_data
 
-    """
-    if borrowed_book and borrowed_member and not is_return:
-        raise forms.ValidationError(f'{borrowed_book__book_name} is already borrowed 
-        by {borrowed_member__member_name}',code='book issued')
-        
-    """
-
     def save(self, commit=True):
         return super(FormRecordAdmin, self).save(commit=commit)
 
 
 class RecordAdmin(admin.ModelAdmin):
     list_display = ('borrowed_ID', 'borrowed_member', 'borrowed_book', 'issued_librarian', 'issue_date', 'return_date',
-                    'is_return', 'returned_date')
+                    'is_return', 'return_date_calculation', 'is_due')
     form = FormRecordAdmin
 
 

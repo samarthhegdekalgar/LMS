@@ -2,6 +2,7 @@ from django.db import models
 from datetime import date, timedelta, datetime
 from django.db.models import signals
 from django.dispatch import receiver
+from numpy.ma import count
 
 
 class Libraries(models.Model):
@@ -17,7 +18,7 @@ class Librarian(models.Model):
     librarian_ID = models.AutoField(primary_key=True, verbose_name='Employee ID')
     librarian_name = models.CharField(verbose_name='Name', max_length=100, help_text='Enter Librarian Name')
     librarian_contact_no = models.IntegerField(verbose_name='Phone number', help_text='Enter Librarian contact number')
-    belong_to = models.ForeignKey(Libraries,verbose_name='Library ID', help_text='Select library ID',
+    belong_to = models.ForeignKey(Libraries, verbose_name='Library ID', help_text='Select library ID',
                                   on_delete=models.CASCADE, null=True)
 
     def __str__(self):
@@ -53,6 +54,7 @@ class Book(models.Model):
             return True
         else:
             return False
+
     is_available.boolean = True
     is_available.short_description = 'Available'
 
@@ -82,13 +84,22 @@ class Record(models.Model):
     is_return = models.BooleanField(default=False, help_text='Select if book is returning', verbose_name='Return')
     returned_date = models.DateField(verbose_name='Returned date', help_text='Enter if book returned',
                                      default=date.today() + timedelta(days=7))
-    time = models.TextField(default=datetime.now())
-
-    class Meta:
-        unique_together = ['borrowed_member', 'borrowed_book', 'is_return', 'time']
+    penalty = models.IntegerField(default=0, verbose_name='Penalty', help_text='Enter in rupee')
 
     def is_due(self):
-        pass
+        if date.today() > self.return_date and not self.is_return:
+            self.penalty = (date.today() - self.return_date).days * 10
+        return self.penalty
+
+    is_due.short_description = 'Penalty'
+
+    def return_date_calculation(self):
+        if self.is_return:
+            return self.return_date
+        else:
+            return 'Not returned'
+
+    return_date_calculation.short_description = 'Returned date'
 
     def __str__(self):
         return str(self.borrowed_ID)
